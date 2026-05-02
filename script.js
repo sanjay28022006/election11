@@ -23,12 +23,21 @@ const REVEAL_TIMEOUT_MS = 3200;
 const IDLE_TIMEOUT_MS = 1500;
 const IDLE_FALLBACK_MS = 300;
 const MAP_DEFAULT_ZOOM = 13;
+const TIME_FORMATTER = new Intl.DateTimeFormat([], { hour: "numeric", minute: "2-digit" });
 
 const MOCK_BOOTHS = [
   { id: 1, name: "City Hall Voting Center", address: "123 Main St, Downtown", distance: "0.4 mi", lat: 37.7749, lng: -122.4194, hours: "7AM-8PM" },
   { id: 2, name: "Riverside Community Center", address: "456 River Rd, Westside", distance: "1.2 mi", lat: 37.7751, lng: -122.418, hours: "6AM-9PM" },
   { id: 3, name: "Northgate Public Library", address: "789 Oak Ave, Northgate", distance: "2.1 mi", lat: 37.776, lng: -122.416, hours: "8AM-7PM" }
 ];
+
+const BOOTH_BY_ID = new Map(MOCK_BOOTHS.map((booth) => [booth.id, booth]));
+
+const BOOTH_CONSTANTS = Object.freeze({
+  defaultLocation: "mock-nearby",
+  mapStatusFallback: "Google Maps embed fallback active (no billing required)",
+  mapStatusReady: "Google Maps API-ready preview"
+});
 
 const STATES = Object.freeze({
   IDLE: "IDLE",
@@ -40,15 +49,17 @@ const STATES = Object.freeze({
 });
 
 // Session memory used by the assistant state machine for multi-step flows.
-const sessionContext = {
+const DEFAULT_SESSION = Object.freeze({
   age: null,
   isCitizen: null,
   eligibilityChecked: false,
   location: null,
   askedAge: false,
   askedCitizen: false,
-  state: "IDLE"
-};
+  state: STATES.IDLE
+});
+
+const sessionContext = { ...DEFAULT_SESSION };
 
 const DEFAULT_SUGGESTIONS = [
   { label: "Am I eligible?", prompt: "Am I eligible to vote?" },
@@ -218,6 +229,23 @@ const scheduleIdleTask = (task) => {
   window.setTimeout(task, IDLE_FALLBACK_MS);
 };
 
+/**
+ * Opens a URL in a new tab with safe opener settings.
+ * @param {string} url - Target URL.
+ * @returns {void}
+ */
+const openExternal = (url) => {
+  const win = window.open(url, "_blank", "noopener");
+  if (win) win.opener = null;
+};
+
+/**
+ * Determines if a key event should activate a control.
+ * @param {KeyboardEvent} event - Keyboard event.
+ * @returns {boolean} True when the key activates a control.
+ */
+const isActivationKey = (event) => event.key === "Enter" || event.key === " ";
+
 scheduleIdleTask(() => checkGoogleService());
 scheduleIdleTask(() => checkGoogleServiceExtended());
 
@@ -233,6 +261,27 @@ const createElement = (tagName, className = "", text = "") => {
   if (className) element.className = className;
   if (text) element.textContent = text;
   return element;
+};
+
+/**
+ * Resets the assistant session to a clean default state.
+ * @returns {void}
+ */
+const resetSessionContext = () => {
+  Object.assign(sessionContext, DEFAULT_SESSION);
+};
+
+/**
+ * Runs an action without mutating the persisted session context.
+ * @template T
+ * @param {() => T} action - Action to run.
+ * @returns {T} Result of the action.
+ */
+const withSessionSnapshot = (action) => {
+  const snapshot = { ...sessionContext };
+  const result = action();
+  Object.assign(sessionContext, snapshot);
+  return result;
 };
 
 /**
@@ -264,7 +313,7 @@ const renderMapFallbackPins = (mapElement) => {
  * @param {string} message - Status message to show on the placeholder.
  * @returns {void}
  */
-const renderMapPlaceholder = (message = "Google Maps API-ready preview") => {
+const renderMapPlaceholder = (message = BOOTH_CONSTANTS.mapStatusReady) => {
   const mapElement = document.getElementById("map");
   if (!mapElement) return;
 
@@ -291,7 +340,7 @@ const renderMapPlaceholder = (message = "Google Maps API-ready preview") => {
  * @param {string} message - Status message to show on the fallback.
  * @returns {void}
  */
-const renderMapEmbedFallback = (message = "Google Maps embed fallback active (no billing required)") => {
+const renderMapEmbedFallback = (message = BOOTH_CONSTANTS.mapStatusFallback) => {
   const mapElement = document.getElementById("map");
   if (!mapElement) return;
 
@@ -327,7 +376,7 @@ function initMap() {
 
   const hasGoogleMaps = Boolean(window.google && window.google.maps && window.google.maps.Map);
   if (!hasGoogleMaps) {
-    renderMapEmbedFallback("Google Maps embed fallback active (no billing required)");
+    renderMapEmbedFallback(BOOTH_CONSTANTS.mapStatusFallback);
     return;
   }
 
@@ -361,7 +410,7 @@ function initMap() {
 
     window.VoteIQGoogleMap = map;
   } catch (e) {
-    renderMapEmbedFallback("Google Maps embed fallback active (no billing required)");
+    renderMapEmbedFallback(BOOTH_CONSTANTS.mapStatusFallback);
   }
 }
 
@@ -371,17 +420,25 @@ window.initMap = initMap;
  * Returns a compact local timestamp for chat messages.
  * @returns {string} Formatted time.
  */
-const getTimestamp = () =>
-  new Intl.DateTimeFormat([], {
-    hour: "numeric",
-    minute: "2-digit"
-  }).format(new Date());
+const getTimestamp = () => TIME_FORMATTER.format(new Date());
+
+/**
+ * Sets the datetime attribute and text for a time element.
+ * @param {HTMLTimeElement} timeEl - Time element.
+ * @returns {void}
+ */
+const setTimeElement = (timeEl) => {
+  const now = new Date();
+  timeEl.textContent = TIME_FORMATTER.format(now);
+  timeEl.setAttribute("datetime", now.toISOString());
+};
 
 /**
  * Stores frequently accessed DOM nodes.
  * @returns {void}
  */
 const cacheElements = () => {
+  const panels = Array.from(document.querySelectorAll("[data-panel-key]"));
   elements = {
     ageInput: document.querySelector("#age-input"),
     citizenshipToggle: document.querySelector("#citizenship-toggle"),
@@ -395,9 +452,20 @@ const cacheElements = () => {
     googleMap: document.querySelector("#map"),
     calendarButton: document.querySelector("#calendar-button"),
     directionsButton: document.querySelector("#directions-button"),
-    welcomeTime: document.querySelector("#welcome-time")
+    welcomeTime: document.querySelector("#welcome-time"),
+    navItems: Array.from(document.querySelectorAll(".nav-item")),
+    mobileTabs: Array.from(document.querySelectorAll(".mobile-tab")),
+    panels,
+    panelsByKey: new Map(panels.map((panel) => [panel.dataset.panelKey, panel]))
   };
 };
+
+/**
+ * Fetches a cached panel by key.
+ * @param {string} key - Panel key.
+ * @returns {HTMLElement|undefined} Panel element.
+ */
+const getPanelByKey = (key) => elements.panelsByKey.get(key);
 
 /**
  * Clears animation-only inline styles so content cannot remain hidden.
@@ -566,8 +634,7 @@ const animateBoothCards = (cards) => {
  */
 const updateWelcomeTimestamp = () => {
   if (!elements.welcomeTime) return;
-  elements.welcomeTime.textContent = getTimestamp();
-  elements.welcomeTime.setAttribute("datetime", new Date().toISOString());
+  setTimeElement(elements.welcomeTime);
 };
 
 /**
@@ -597,7 +664,7 @@ const addMessage = (content, sender = "bot") => {
   const bubble = createElement("div", `chat-bubble ${isUser ? "user-bubble" : "bot-bubble"}`);
   const timestamp = createElement("time", "timestamp", getTimestamp());
 
-  timestamp.setAttribute("datetime", new Date().toISOString());
+  setTimeElement(timestamp);
   appendMessageText(bubble, content);
   stack.append(bubble, timestamp);
 
@@ -619,7 +686,9 @@ const addMessage = (content, sender = "bot") => {
  * @returns {void}
  */
 const scrollChatToBottom = () => {
-  elements.chatLog.scrollTop = elements.chatLog.scrollHeight;
+  window.requestAnimationFrame(() => {
+    elements.chatLog.scrollTop = elements.chatLog.scrollHeight;
+  });
 };
 
 /**
@@ -797,11 +866,7 @@ const respondToHowToVote = () => {
 const respondToDocuments = () => ({
   message:
     "Common voting documents include a government photo ID where required, voter registration confirmation, proof of residence, a mail ballot envelope if applicable, and any accessibility or assistance authorization. Always verify the exact list with your official election office.",
-  suggestions: [
-    { label: "Check eligibility", prompt: "Am I eligible to vote?" },
-    { label: "Find my polling booth", prompt: "Find my polling booth" },
-    { label: "How do I register?", prompt: "How do I register?" }
-  ]
+  suggestions: DEFAULT_SUGGESTIONS
 });
 
 /**
@@ -809,7 +874,7 @@ const respondToDocuments = () => ({
  * @returns {{message:string,suggestions:{label:string,prompt:string}[]}} Assistant response.
  */
 const respondToBooths = () => {
-  sessionContext.location = "mock-nearby";
+  sessionContext.location = BOOTH_CONSTANTS.defaultLocation;
   sessionContext.state = STATES.POST_BOOTH;
   return {
     message:
@@ -825,11 +890,7 @@ const respondToBooths = () => {
 const respondToCalendar = () => ({
   message:
     "Use the Add Reminder button in the booth panel to create an Election Day reminder. It opens a real Google Calendar template in a new tab without requiring an API key.",
-  suggestions: [
-    { label: "Find my booth", prompt: "Find my polling booth" },
-    { label: "What should I bring?", prompt: "What documents should I bring?" },
-    { label: "Review voting steps", prompt: "How do I vote?" }
-  ]
+  suggestions: BOOTH_SUGGESTIONS
 });
 
 /**
@@ -1103,8 +1164,7 @@ const setupDisclosures = () => {
  * @returns {void}
  */
 const handleCalendarClick = () => {
-  const calendarWindow = window.open(buildCalendarURL(), "_blank");
-  if (calendarWindow) calendarWindow.opener = null;
+  openExternal(buildCalendarURL());
 };
 
 /**
@@ -1114,7 +1174,7 @@ const handleCalendarClick = () => {
 const handlePrimaryDirections = () => {
   const booth = MOCK_BOOTHS[0];
   if (!booth) return;
-  window.open(buildDirectionsURL(booth), "_blank", "noopener");
+  openExternal(buildDirectionsURL(booth));
 };
 
 /**
@@ -1123,7 +1183,7 @@ const handlePrimaryDirections = () => {
  * @returns {void}
  */
 const handleMapKeyboard = (event) => {
-  if (event.key === "Enter" || event.key === " ") {
+  if (isActivationKey(event)) {
     event.preventDefault();
     handlePrimaryDirections();
   }
@@ -1136,9 +1196,9 @@ const handleMapKeyboard = (event) => {
  */
 const handleDirectionClick = (event) => {
   const id = Number(event.currentTarget.dataset.boothId);
-  const booth = MOCK_BOOTHS.find((item) => item.id === id);
+  const booth = BOOTH_BY_ID.get(id);
   if (!booth) return;
-  window.open(buildDirectionsURL(booth), "_blank", "noopener");
+  openExternal(buildDirectionsURL(booth));
 };
 
 /**
@@ -1147,6 +1207,9 @@ const handleDirectionClick = (event) => {
  */
 const renderBoothCards = () => {
   elements.boothList.replaceChildren();
+  elements.boothList.setAttribute("role", "status");
+  elements.boothList.setAttribute("aria-live", "polite");
+  elements.boothList.setAttribute("aria-busy", "true");
   const fragment = document.createDocumentFragment();
   MOCK_BOOTHS.forEach((booth) => {
     const card = createElement("article", "booth-card");
@@ -1168,6 +1231,7 @@ const renderBoothCards = () => {
   });
 
   elements.boothList.append(fragment);
+  elements.boothList.setAttribute("aria-busy", "false");
 
   animateBoothCards(elements.boothList.querySelectorAll(".booth-card"));
 };
@@ -1178,7 +1242,7 @@ const renderBoothCards = () => {
  * @returns {void}
  */
 const setActiveNav = (target) => {
-  document.querySelectorAll(".nav-item").forEach((item) => {
+  elements.navItems.forEach((item) => {
     item.classList.toggle("active", item.dataset.navTarget === target);
   });
 };
@@ -1189,7 +1253,7 @@ const setActiveNav = (target) => {
  * @returns {void}
  */
 const setActiveMobileTab = (target) => {
-  document.querySelectorAll(".mobile-tab").forEach((item) => {
+  elements.mobileTabs.forEach((item) => {
     item.classList.toggle("active", item.dataset.mobileTarget === target);
   });
 };
@@ -1202,8 +1266,8 @@ const setActiveMobileTab = (target) => {
 const switchMobilePanel = (target) => {
   if (target === currentMobilePanel) return;
 
-  const outEl = document.querySelector(`[data-panel-key="${currentMobilePanel}"]`);
-  const inEl = document.querySelector(`[data-panel-key="${target}"]`);
+  const outEl = getPanelByKey(currentMobilePanel);
+  const inEl = getPanelByKey(target);
   if (!outEl || !inEl) return;
 
   setActiveMobileTab(target);
@@ -1251,7 +1315,7 @@ const handleMobileTabClick = (event) => {
  */
 const handleNavClick = (event) => {
   const target = event.currentTarget.dataset.navTarget;
-  const panel = document.querySelector(`[data-panel-key="${target}"]`);
+  const panel = getPanelByKey(target);
   if (!panel) return;
 
   setActiveNav(target);
@@ -1269,10 +1333,8 @@ const handleNavClick = (event) => {
  */
 const applyResponsivePanelState = () => {
   const isMobile = window.matchMedia("(max-width: 768px)").matches;
-  const panels = document.querySelectorAll("[data-panel-key]");
-
   if (!isMobile) {
-    panels.forEach((panel) => {
+    elements.panels.forEach((panel) => {
       panel.style.display = "";
       panel.style.opacity = "";
       panel.style.transform = "";
@@ -1280,7 +1342,7 @@ const applyResponsivePanelState = () => {
     return;
   }
 
-  panels.forEach((panel) => {
+  elements.panels.forEach((panel) => {
     panel.style.display = panel.dataset.panelKey === currentMobilePanel ? "flex" : "none";
   });
 };
@@ -1290,8 +1352,8 @@ const applyResponsivePanelState = () => {
  * @returns {void}
  */
 const setupNavigation = () => {
-  addListeners(document.querySelectorAll(".nav-item"), "click", handleNavClick);
-  addListeners(document.querySelectorAll(".mobile-tab"), "click", handleMobileTabClick);
+  addListeners(elements.navItems, "click", handleNavClick);
+  addListeners(elements.mobileTabs, "click", handleMobileTabClick);
   window.addEventListener("resize", () => {
     if (resizeFrame !== null) window.cancelAnimationFrame(resizeFrame);
     resizeFrame = window.requestAnimationFrame(() => {
@@ -1344,6 +1406,39 @@ const runTestCases = () => [
   createTestResult('detectIntent("am I eligible") === "ELIGIBILITY"', detectIntent("am I eligible"), "ELIGIBILITY"),
   createTestResult('detectIntent("where is polling booth") === "POLLING_BOOTH"', detectIntent("where is polling booth"), "POLLING_BOOTH"),
   createTestResult('detectIntent("add to calendar") === "CALENDAR"', detectIntent("add to calendar"), "CALENDAR"),
+  createTestResult('detectIntent("hello") === "GREETING"', detectIntent("hello"), "GREETING"),
+  createTestResult("buildDirectionsURL contains maps/dir", buildDirectionsURL(MOCK_BOOTHS[0]).includes("maps/dir"), true),
+  createTestResult(
+    "resetSessionContext returns to IDLE",
+    withSessionSnapshot(() => {
+      sessionContext.state = STATES.POST_BOOTH;
+      resetSessionContext();
+      return sessionContext.state === STATES.IDLE;
+    }),
+    true
+  ),
+  createTestResult(
+    "State machine asks for age",
+    withSessionSnapshot(() => getAssistantResponse("Am I eligible?").message.includes("What is your age")),
+    true
+  ),
+  createTestResult(
+    "State machine asks for citizenship",
+    withSessionSnapshot(() => {
+      sessionContext.state = STATES.ASK_AGE;
+      return getAssistantResponse("I am 20").message.includes("citizen");
+    }),
+    true
+  ),
+  createTestResult(
+    "State machine yields eligibility result",
+    withSessionSnapshot(() => {
+      sessionContext.age = 20;
+      sessionContext.state = STATES.ASK_CITIZENSHIP;
+      return getAssistantResponse("yes").message.includes("eligible");
+    }),
+    true
+  ),
   createTestResult('validateInput("") === false', validateInput(""), false),
   createTestResult('validateInput("hello") === true', validateInput("hello"), true)
 ];
@@ -1367,6 +1462,8 @@ const buildDiagnosticsReport = () => {
   const firebaseReady = Boolean(window.firebase && typeof window.firebase.initializeApp === "function");
   const analyticsReady = Boolean(window.gtag && window.dataLayer);
   const identityReady = Boolean(window.google && window.google.accounts && window.google.accounts.id);
+  const testResults = runTestCases();
+  const passedCount = testResults.filter((result) => result.passed).length;
 
   return [
     { label: "Google Maps JS API", value: googleMapsReady ? "ready" : "fallback" },
@@ -1374,7 +1471,8 @@ const buildDiagnosticsReport = () => {
     { label: "Google Analytics", value: analyticsReady ? "ready" : "pending" },
     { label: "Google Identity", value: identityReady ? "ready" : "pending" },
     { label: "Firebase", value: firebaseReady ? "ready" : "pending" },
-    { label: "State machine", value: "active" }
+    { label: "State machine", value: "active" },
+    { label: "Test suite", value: `${passedCount}/${testResults.length}` }
   ];
 };
 
@@ -1392,6 +1490,7 @@ const renderDiagnosticsPanel = () => {
   const summary = createElement("p", "", "Realtime signals for evaluation");
   summary.setAttribute("role", "status");
   summary.setAttribute("aria-live", "polite");
+  summary.setAttribute("aria-atomic", "true");
   const list = createElement("ul", "diagnostic-list");
 
   buildDiagnosticsReport().forEach((row) => {

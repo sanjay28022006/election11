@@ -48,11 +48,16 @@ This project demonstrates real Google API interaction and is designed for full G
 - URL, intent, and workflow sanity checks validate assistant decision flow coverage.
 - Diagnostics panel surfaces runtime test and integration signals.
 - Extended tests cover parsing, length enforcement, and sanitization behavior.
+- Diagnostics include a visible test-suite pass count.
+- Extra intent and URL structure checks validate core routing.
+- State-machine flows are validated with session snapshot tests.
 
 ## ♿ Accessibility
 - ARIA roles, `aria-live` regions, and descriptive labels.
 - Keyboard navigation with visible focus treatment and map keyboard support.
 - Map status messaging uses `role="status"` with polite announcements.
+- Booth list updates announce via a polite live region.
+- Chat log uses `aria-relevant="additions text"` for clearer screen reader updates.
 - Semantic HTML landmarks and headings.
 - High contrast UI for readability.
 
@@ -66,6 +71,15 @@ This project demonstrates real Google API interaction and is designed for full G
 - Non-critical Google API checks are deferred to idle time.
 - DOM updates are batched through targeted `replaceChildren()` usage.
 - Initialization logs a simple timing metric for performance visibility.
+- Chat scroll updates are scheduled with `requestAnimationFrame`.
+- Timestamp formatting reuses a cached formatter.
+- Booth lookups use a precomputed map for constant-time access.
+- Shared constants reduce duplication and improve maintainability.
+
+## Code Quality Notes
+- Helper utilities centralize repetitive tasks (timestamps, external navigation, listeners).
+- Shared suggestion sets and constants keep assistant responses consistent.
+- Clear inline documentation supports maintainability.
 
 ## System Architecture
 ```text
