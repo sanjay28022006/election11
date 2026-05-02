@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="AI-powered election assistant with intelligent decision-making, Google services integration, and accessible UI" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com https://maps.googleapis.com https://maps.gstatic.com https://www.gstatic.com https://accounts.google.com https://www.googletagmanager.com; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src https://fonts.gstatic.com; img-src 'self' data: https://maps.gstatic.com https://maps.googleapis.com https://*.googleapis.com https://*.gstatic.com https://*.ggpht.com https://*.googleusercontent.com; connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://www.googleapis.com https://maps.googleapis.com https://www.google-analytics.com https://firebaseinstallations.googleapis.com https://firebaseremoteconfig.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com; frame-src https://www.google.com https://accounts.google.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests"
+    />
+    <title>VoteIQ Election Process Education Assistant</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <a href="#chat-input" class="skip-link">Skip to chat</a>
+
+    <header class="header">
+      <div class="brand" aria-label="VoteIQ home">
+        <div class="logo-mark" aria-hidden="true">V</div>
+        <div>
+          <p class="logo-text">VoteIQ</p>
+          <p class="logo-kicker">Election Process Education Assistant</p>
+        </div>
+      </div>
+
+      <nav class="nav-tabs" aria-label="Primary">
+        <button class="nav-item active" type="button" data-nav-target="center" aria-label="Open assistant panel">
+          <span aria-hidden="true">◐</span>
+          Assistant
+        </button>
+        <button class="nav-item" type="button" data-nav-target="left" aria-label="Open eligibility and voting guide panel">
+          <span aria-hidden="true">✓</span>
+          Eligibility
+        </button>
+        <button class="nav-item" type="button" data-nav-target="right" aria-label="Open booth finder panel">
+          <span aria-hidden="true">⌖</span>
+          Booths
+        </button>
+      </nav>
+    </header>
+
+    <main class="app-shell" id="main-content">
+      <aside class="panel panel-left" data-panel-key="left" aria-labelledby="learning-panel-title">
+        <section class="info-card eligibility-card" aria-labelledby="eligibility-title">
+          <div class="card-heading">
+            <p class="eyebrow">Check first</p>
+            <h2 id="eligibility-title">Eligibility Checker</h2>
+          </div>
+
+          <label class="field-label" for="age-input">Age</label>
+          <input
+            id="age-input"
+            class="text-input"
+            type="number"
+            min="1"
+            max="119"
+            inputmode="numeric"
+            placeholder="Enter age"
+            aria-describedby="age-help"
+          />
+          <p id="age-help" class="field-help">Voting eligibility starts at age 18.</p>
+
+          <div class="toggle-row">
+            <span class="field-label">Citizen</span>
+            <label class="switch" for="citizenship-toggle">
+              <input id="citizenship-toggle" type="checkbox" role="switch" aria-label="Confirm citizenship" />
+              <span class="toggle-track" aria-hidden="true">
+                <span class="toggle-thumb"></span>
+              </span>
+            </label>
+          </div>
+
+          <button id="eligibility-button" class="btn btn-gold" type="button" aria-label="Check voting eligibility">
+            <span aria-hidden="true">✓</span>
+            Check
+          </button>
+
+          <output id="eligibility-result" class="result-badge" aria-live="polite">Awaiting details</output>
+        </section>
+
+        <section class="info-card" aria-labelledby="learning-panel-title">
+          <div class="card-heading">
+            <p class="eyebrow">Process</p>
+            <h2 id="learning-panel-title">Voting Steps</h2>
+          </div>
+
+          <div class="accordion" data-disclosure-group="steps">
+            <article class="accordion-item">
+              <button class="accordion-trigger" type="button" aria-expanded="true" aria-controls="step-register" aria-label="Toggle registration step">
+                <span class="step-number">1</span>
+                Register
+                <span class="chevron" aria-hidden="true">›</span>
+              </button>
+              <div id="step-register" class="accordion-panel">
+                <p>Complete your voter registration before the local deadline using the official election office portal or an approved in-person form.</p>
+              </div>
+            </article>
+
+            <article class="accordion-item">
+              <button class="accordion-trigger" type="button" aria-expanded="false" aria-controls="step-verify" aria-label="Toggle ID verification step">
+                <span class="step-number">2</span>
+                Verify ID
+                <span class="chevron" aria-hidden="true">›</span>
+              </button>
+              <div id="step-verify" class="accordion-panel">
+                <p>Review accepted identification rules for your jurisdiction and make sure your name and current address match your voter record.</p>
+              </div>
+            </article>
+
+            <article class="accordion-item">
+              <button class="accordion-trigger" type="button" aria-expanded="false" aria-controls="step-booth" aria-label="Toggle polling booth step">
+                <span class="step-number">3</span>
+                Find Booth
+                <span class="chevron" aria-hidden="true">›</span>
+              </button>
+              <div id="step-booth" class="accordion-panel">
+                <p>Use your assigned polling place or voting center, then check opening hours, transit access, and accessibility services before Election Day.</p>
+              </div>
+            </article>
+
+            <article class="accordion-item">
+              <button class="accordion-trigger" type="button" aria-expanded="false" aria-controls="step-cast" aria-label="Toggle cast vote step">
+                <span class="step-number">4</span>
+                Cast Vote
+                <span class="chevron" aria-hidden="true">›</span>
+              </button>
+              <div id="step-cast" class="accordion-panel">
+                <p>Mark your ballot carefully, ask a poll worker for a replacement ballot if you make a mistake, and follow posted privacy instructions.</p>
+              </div>
+            </article>
+
+            <article class="accordion-item">
+              <button class="accordion-trigger" type="button" aria-expanded="false" aria-controls="step-confirm" aria-label="Toggle vote confirmation step">
+                <span class="step-number">5</span>
+                Confirm
+                <span class="chevron" aria-hidden="true">›</span>
+              </button>
+              <div id="step-confirm" class="accordion-panel">
+                <p>Submit the ballot using the scanner, drop box, or official envelope process, then keep any receipt or tracking reference provided.</p>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section class="info-card" aria-labelledby="faq-title">
+          <div class="card-heading">
+            <p class="eyebrow">Quick answers</p>
+            <h2 id="faq-title">FAQ</h2>
+          </div>
+
+          <div class="faq-list" data-disclosure-group="faq">
+            <article class="faq-item">
+              <button class="faq-trigger" type="button" aria-expanded="false" aria-controls="faq-one" aria-label="Toggle FAQ about changed registration">
+                What if my registration changed?
+                <span class="chevron" aria-hidden="true">›</span>
+              </button>
+              <div id="faq-one" class="faq-panel">
+                <p>Update your voter record after a name, address, party, or eligibility change. Deadlines vary by jurisdiction.</p>
+              </div>
+            </article>
+
+            <article class="faq-item">
+              <button class="faq-trigger" type="button" aria-expanded="false" aria-controls="faq-two" aria-label="Toggle FAQ about early voting">
+                Can I vote early?
+                <span class="chevron" aria-hidden="true">›</span>
+              </button>
+              <div id="faq-two" class="faq-panel">
+                <p>Many jurisdictions offer early voting or mail voting. Check your official election office for dates and rules.</p>
+              </div>
+            </article>
+
+            <article class="faq-item">
+              <button class="faq-trigger" type="button" aria-expanded="false" aria-controls="faq-three" aria-label="Toggle FAQ about voter assistance">
+                What if I need assistance?
+                <span class="chevron" aria-hidden="true">›</span>
+              </button>
+              <div id="faq-three" class="faq-panel">
+                <p>Accessible voting equipment, curbside voting, language support, and helper rules are commonly available through election offices.</p>
+              </div>
+            </article>
+
+            <article class="faq-item">
+              <button class="faq-trigger" type="button" aria-expanded="false" aria-controls="faq-four" aria-label="Toggle FAQ about provisional ballots">
+                What is a provisional ballot?
+                <span class="chevron" aria-hidden="true">›</span>
+              </button>
+              <div id="faq-four" class="faq-panel">
+                <p>A provisional ballot preserves your vote while officials verify eligibility, registration, or polling place questions.</p>
+              </div>
+            </article>
+
+            <article class="faq-item">
+              <button class="faq-trigger" type="button" aria-expanded="false" aria-controls="faq-five" aria-label="Toggle FAQ about ballot status">
+                Can I check ballot status?
+                <span class="chevron" aria-hidden="true">›</span>
+              </button>
+              <div id="faq-five" class="faq-panel">
+                <p>Some jurisdictions provide online tracking for mailed or provisional ballots. Use only official government lookup tools.</p>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section class="info-card" aria-labelledby="documents-title">
+          <div class="card-heading">
+            <p class="eyebrow">Bring along</p>
+            <h2 id="documents-title">Documents Required</h2>
+          </div>
+
+          <ul class="document-list">
+            <li><span aria-hidden="true">◆</span> Government photo ID where required</li>
+            <li><span aria-hidden="true">◈</span> Voter registration confirmation</li>
+            <li><span aria-hidden="true">◇</span> Proof of residence when requested</li>
+            <li><span aria-hidden="true">●</span> Mail ballot envelope or tracking slip</li>
+            <li><span aria-hidden="true">★</span> Accessibility or assistance authorization</li>
+          </ul>
+        </section>
+      </aside>
+
+      <section class="panel panel-center" data-panel-key="center" aria-label="VoteIQ chat assistant">
+        <div class="chat-topline">
+          <div>
+            <p class="eyebrow">Civic assistant</p>
+            <h1>Ask VoteIQ</h1>
+          </div>
+          <div class="status-pill" aria-label="Assistant status">
+            <span class="status-dot" aria-hidden="true"></span>
+            Ready
+          </div>
+        </div>
+
+        <div id="chat-log" class="chat-log" role="log" aria-live="polite" aria-label="Conversation">
+          <article class="chat-message bot welcome-msg">
+            <div class="bot-avatar" aria-hidden="true">⚖</div>
+            <div class="message-stack">
+              <div class="chat-bubble bot-bubble">
+                <p>Welcome to VoteIQ. Ask about eligibility, registration, documents, polling places, or election reminders.</p>
+              </div>
+              <time id="welcome-time" class="timestamp">Just now</time>
+            </div>
+          </article>
+        </div>
+
+        <div class="chat-input-zone">
+          <div id="suggestion-chips" class="suggestion-chips" aria-label="Suggested questions">
+            <button class="suggestion-chip" type="button" data-prompt="Am I eligible to vote?" aria-label="Ask if you are eligible to vote">
+              Am I eligible?
+            </button>
+            <button class="suggestion-chip" type="button" data-prompt="How do I register?" aria-label="Ask how to register">
+              How do I register?
+            </button>
+            <button class="suggestion-chip" type="button" data-prompt="Where is my polling booth?" aria-label="Ask where your polling booth is">
+              Find my booth
+            </button>
+          </div>
+
+          <form id="chat-form" class="chat-input-bar" autocomplete="off">
+            <label class="sr-only" for="chat-input">Type your question</label>
+            <input
+              id="chat-input"
+              class="chat-input"
+              type="text"
+              maxlength="499"
+              aria-label="Type your question"
+              placeholder="Ask about voting, documents, booth lookup..."
+            />
+            <button id="send-button" class="send-button" type="submit" aria-label="Send message">
+              <span aria-hidden="true">➤</span>
+            </button>
+          </form>
+        </div>
+      </section>
+
+      <aside class="panel panel-right" data-panel-key="right" aria-labelledby="google-services-title">
+        <section class="map-card info-card google-services-card" aria-labelledby="google-services-title">
+          <div class="card-heading">
+            <p class="eyebrow">Google services</p>
+            <h2 id="google-services-title">Google Services Integration</h2>
+          </div>
+
+          <div class="map-shell" aria-label="Google Maps API target for polling stations">
+            <div
+              id="map"
+              class="map-grid google-map map-placeholder"
+              role="img"
+              aria-label="Google Maps API-ready polling station map"
+              aria-describedby="map-help"
+              tabindex="0"
+            >
+              <span class="map-pin pin-one" aria-hidden="true"></span>
+              <span class="map-pin pin-two" aria-hidden="true"></span>
+              <span class="map-pin pin-three" aria-hidden="true"></span>
+              <span class="map-status">Google Maps API-ready preview</span>
+            </div>
+          </div>
+
+          <p id="map-help" class="sr-only">Press Enter to open Google Maps directions for the closest polling booth.</p>
+
+          <button id="directions-button" class="btn btn-gold" type="button" aria-label="Get directions to the closest polling booth">
+            <span aria-hidden="true">➤</span>
+            Get Directions
+          </button>
+
+          <button id="calendar-button" class="btn btn-blue" type="button" aria-label="Add election reminder to Google Calendar">
+            <span aria-hidden="true">▣</span>
+            Add Reminder
+          </button>
+
+          <div id="google-signin" class="google-signin" role="group" aria-label="Google Identity Services demo"></div>
+        </section>
+
+        <section class="booth-section" aria-label="Nearby booth results">
+          <div id="booth-list" class="booth-list"></div>
+        </section>
+      </aside>
+    </main>
+
+    <nav class="mobile-tabs" aria-label="Mobile panels">
+      <button class="mobile-tab" type="button" data-mobile-target="left" aria-label="Show eligibility panel">
+        <span aria-hidden="true">✓</span>
+        Guide
+      </button>
+      <button class="mobile-tab active" type="button" data-mobile-target="center" aria-label="Show assistant panel">
+        <span aria-hidden="true">◐</span>
+        Chat
+      </button>
+      <button class="mobile-tab" type="button" data-mobile-target="right" aria-label="Show booth finder panel">
+        <span aria-hidden="true">⌖</span>
+        Booths
+      </button>
+    </nav>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-analytics-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="script.js" defer></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&callback=initMap" async defer></script>
+  </body>
+</html>
