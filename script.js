@@ -77,6 +77,7 @@ const ELIGIBILITY_SUGGESTIONS = [
 let elements = {};
 let currentMobilePanel = "center";
 let typingNode = null;
+let resizeFrame = null;
 
 /**
  * Converts potentially unsafe characters into HTML entities.
@@ -232,6 +233,17 @@ const createElement = (tagName, className = "", text = "") => {
   if (className) element.className = className;
   if (text) element.textContent = text;
   return element;
+};
+
+/**
+ * Attaches a shared event handler to a list of elements.
+ * @param {NodeListOf<HTMLElement>|HTMLElement[]} nodes - Elements to bind.
+ * @param {string} eventName - Event name.
+ * @param {(event: Event) => void} handler - Event handler.
+ * @returns {void}
+ */
+const addListeners = (nodes, eventName, handler) => {
+  nodes.forEach((node) => node.addEventListener(eventName, handler));
 };
 
 /**
@@ -1278,9 +1290,15 @@ const applyResponsivePanelState = () => {
  * @returns {void}
  */
 const setupNavigation = () => {
-  document.querySelectorAll(".nav-item").forEach((button) => button.addEventListener("click", handleNavClick));
-  document.querySelectorAll(".mobile-tab").forEach((button) => button.addEventListener("click", handleMobileTabClick));
-  window.addEventListener("resize", applyResponsivePanelState);
+  addListeners(document.querySelectorAll(".nav-item"), "click", handleNavClick);
+  addListeners(document.querySelectorAll(".mobile-tab"), "click", handleMobileTabClick);
+  window.addEventListener("resize", () => {
+    if (resizeFrame !== null) window.cancelAnimationFrame(resizeFrame);
+    resizeFrame = window.requestAnimationFrame(() => {
+      applyResponsivePanelState();
+      resizeFrame = null;
+    });
+  });
   applyResponsivePanelState();
 };
 
@@ -1438,7 +1456,7 @@ const bindEvents = () => {
   if (elements.googleMap) {
     elements.googleMap.addEventListener("keydown", handleMapKeyboard);
   }
-  elements.suggestionChips.querySelectorAll(".suggestion-chip").forEach((chip) => chip.addEventListener("click", handleSuggestionClick));
+  addListeners(elements.suggestionChips.querySelectorAll(".suggestion-chip"), "click", handleSuggestionClick);
 };
 
 /**
